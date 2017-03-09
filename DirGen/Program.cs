@@ -44,7 +44,7 @@ Version {verInfo.ProductVersion}
 (C) 2014-2017 Chronoir.net{Environment.NewLine}" );
 				Console.WriteLine( @"使い方 : 
   ディレクトリー構成とトークン情報を定義したXMLファイル1つを、実行ファイルにドラッグ＆ドロップします。
-  ディレクトリー構成とトークン情報を記述方法は、マニュアルを参照してください。
+  ディレクトリー構成とトークン情報の記述方法は、readmeを参照してください。
 
 オプション :
   -xml [XMLファイル名] : ディレクトリー構成とトークン情報を定義した雛形のXMLファイルを作成します。" );
@@ -79,14 +79,19 @@ Version {verInfo.ProductVersion}
 		/// </summary>
 		/// <param name="xmlPath">XMLファイルのパス</param>
 		static void CreateXML( string xmlPath ) {
+
 			Console.WriteLine( $"ディレクトリー構成・トークン情報の定義した雛形のXMLファイル '{xmlPath}' を作成しています。" );
 
 			try {
+				var targetPath = Path.GetDirectoryName( xmlPath );
+
 				new XElement( "dirgen",
 					new XComment( "'directory' ノードにディレクトリー構成情報を記述します。" ),
+					new XComment( "'name' 属性には、出力先パスに作成するルートフォルダーの名前を入力します。省略した場合、ルートフォルダーを作成せず、子ノード内で定義を元にディレクトリーを直接作成します。" ),
 					new XComment( "'target_path' 属性には、出力先のパスを入力します。省略した場合、アプリと同じパスとなります。" ),
 					new XElement( "directory",
-						new XAttribute( "target_path", Path.GetFileNameWithoutExtension( xmlPath ) ),
+						new XAttribute( "name", Path.GetFileNameWithoutExtension( xmlPath ) ),
+						string.IsNullOrEmpty( targetPath ) ? null : new XAttribute( "target_path", targetPath ),
 						new XComment( "'path' ノードは、'name' 属性で指定したフォルダーを作成します。" ),
 						new XElement( "path",
 							new XAttribute( "name", "Sample1" )

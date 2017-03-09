@@ -36,6 +36,11 @@ namespace DirGen {
 		private string targetRootPath;
 
 		/// <summary>
+		///		出力先のパスに作成するルートフォルダー名を表します。
+		/// </summary>
+		private string targetRootFolderName;
+
+		/// <summary>
 		///		ディレクトリー構造を表す、XMLツリーを表します。
 		/// </summary>
 		private XElement directoryTree;
@@ -63,7 +68,7 @@ namespace DirGen {
 		/// <summary>
 		///		<see cref="DirectoryGenerator">クラスの新しいインスタンスを生成します。
 		/// </summary>
-		public DirectoryGenerator() {}
+		public DirectoryGenerator() { }
 
 		/// <summary>
 		///		メッセージを発行します。
@@ -100,12 +105,16 @@ namespace DirGen {
 			NotifyMessage( $"出力先のパスを読み込んでいます。" );
 			// target_pathが未指定の場合、アプリのパスを設定します。
 			targetRootPath = directoryTree.Attribute( "target_path" )?.Value ?? appPath;
+
+			// nameが未指定の場合、nullを設定します。
+			targetRootFolderName = directoryTree.Attribute( "name" )?.Value;
 		}
 
 		/// <summary>
 		///		ディレクトリー構造を解析し、トークンを展開します。
 		/// </summary>
 		private void ExtractDirectoryTree() {
+
 			NotifyMessage( $"ディレクトリー構成を解析しています。" );
 
 			// 展開後のディレクトリー構造のXMLオブジェクトを作成します。
@@ -115,36 +124,36 @@ namespace DirGen {
 			var curNode = extractedDirectoryTree;
 
 			// 子ノードを探索済みフラグを表します。
-			bool childNodeVisited = false;
+			bool childNodeIsVisited = false;
 
 			while( curNode != null ) {
 
 				#region 子ノードの探索
 
 				// カレントノードにて、未探索の子ノードがあるかどうか判別します。
-				if( !childNodeVisited && curNode.HasElements ) {
+				if( !childNodeIsVisited && curNode.HasElements ) {
 					// 末っ子のノードにアクセスします。
 					while( true ) {
 						// 子ノードを取得し、種類を判別します。
-						var child = curNode.FirstNode;
+						var childNode = curNode.FirstNode;
 						// 子ノードが存在しない時、ループから抜けます。
-						if( child == null ) {
+						if( childNode == null ) {
 							break;
 						}
 						// 子ノードが要素の時、カレントノードに設定します。
-						else if( child is XElement ) {
-							curNode = child as XElement;
+						else if( childNode is XElement ) {
+							curNode = childNode as XElement;
 						}
 						// 子ノードが要素以外（コメントなど）の時、そのノードを削除します。
 						else {
-							child.Remove();
+							childNode.Remove();
 						}
 					}
 					continue;
 				}
 				// 子ノードを探索済みの場合、フラグをオフにします。
-				else if( childNodeVisited ) {
-					childNodeVisited = false;
+				else if( childNodeIsVisited ) {
+					childNodeIsVisited = false;
 				}
 
 				#endregion
@@ -182,21 +191,21 @@ namespace DirGen {
 
 				// 次のノードを判別します。
 				while( true ) {
-					var next = curNode.NextNode;
+					var nextNode = curNode.NextNode;
 					// 次のノードが存在しない時、親のノードに戻ります。
-					if( next == null ) {
+					if( nextNode == null ) {
 						curNode = curNode.Parent;
-						childNodeVisited = true;
+						childNodeIsVisited = true;
 						break;
 					}
 					// 次のノードが要素の時、カレントノードに設定します。
-					else if( next is XElement ) {
-						curNode = next as XElement;
+					else if( nextNode is XElement ) {
+						curNode = nextNode as XElement;
 						break;
 					}
 					// 次のノードが要素以外（コメントなど）の時、そのノードを削除します。
 					else {
-						next.Remove();
+						nextNode.Remove();
 					}
 				}
 
@@ -211,23 +220,41 @@ namespace DirGen {
 		/// </summary>
 		private void CreateDirectory() {
 
-			NotifyMessage( $"ディレクトリーを作成しています。" );
-
-			// ディレクトリーの出力先パスが既に存在するかどうか判別します。
-			if( Directory.Exists( targetRootPath ) ) {
-				throw new Exception( $"'{targetRootPath}' は既に存在しています。削除してからやり直してください。" );
-			}
-
-			// ディレクトリーの出力先パスを作成し、カレントディレクトリーを移動します。
-			Directory.CreateDirectory( targetRootPath );
-			Directory.SetCurrentDirectory( targetRootPath );
-
 			try {
+				NotifyMessage( $"ディレクトリーを作成しています。" );
+
+				// ディレクトリーの出力先パスが存在するかどうか判別します。
+				if( !Directory.Exists( targetRootPath ) ) {
+					throw new Exception( $"出力先パス '{targetRootFolderName}' が存在しないか、ディレクトリー名が無効です。" );
+				}
+
+				// ディレクトリーの出力先パスにカレントディレクトリーを移動します。
+				Directory.SetCurrentDirectory( targetRootPath );
+
+				// ルートフォルダーを作成するかどうか判別します。
+				if( targetRootFolderName != null ) {
+					// ディレクトリーの出力先パスが既に存在するかどうか判別します。
+					if( Directory.Exists( targetRootFolderName ) ) {
+						throw new Exception( $"ルートフォルダー '{targetRootFolderName}' は出力先パスに既に存在しています。削除してからやり直してください。" );
+					}
+					// ルートフォルダーを作成し、カレントディレクトリーを移動します。
+					Directory.CreateDirectory( targetRootFolderName );
+					Directory.SetCurrentDirectory( targetRootFolderName );
+				}
+				else {
+					// 出力先パスにファイルやフォルダーが存在するかどうか判別します。
+					if( Directory.EnumerateDirectories( Directory.GetCurrentDirectory() ).Any() ||
+						Directory.EnumerateFiles( Directory.GetCurrentDirectory() ).Any() ||
+						Directory.EnumerateFileSystemEntries( Directory.GetCurrentDirectory() ).Any() ) {
+						throw new Exception( $"出力先パス '{targetRootPath}' 内に別のファイルやフォルダーが存在しています。それらを削除するか、ディレクトリーを格納するルートフォルダーの作成を検討してください。" );
+					}
+				}
+
 				// SAXパーサーを使って、展開後のXMLツリーを読み込み、ディレクトリーを作成していきます。
 				using( var reader = XmlReader.Create( new StringReader( extractedDirectoryTree.ToString() ) ) ) {
 					while( reader.Read() ) {
 						switch( reader.NodeType ) {
-							case XmlNodeType.Element:		// 要素のノード
+							case XmlNodeType.Element:       // 要素のノード
 								// 現在のノードの子ノードから空であるかどうかの情報を取得します。
 								// ※ここで値を保持するのは、MoveToAttributeメソッドの実行後では、値を正しく取得できないからです。
 								var isEmptyElement = reader.IsEmptyElement;
@@ -259,7 +286,7 @@ namespace DirGen {
 									}
 								}
 								break;
-							case XmlNodeType.EndElement:		// 要素の終了ノード
+							case XmlNodeType.EndElement:        // 要素の終了ノード
 								// フォルダー用ノードの時、1つ親のフォルダーに移動します。
 								if( reader.Name == "path" ) {
 									Directory.SetCurrentDirectory( "..\\" );
