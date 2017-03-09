@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
 
@@ -61,6 +62,26 @@ namespace DirGen {
 		private static readonly string appPath = Directory.GetCurrentDirectory();
 
 		/// <summary>
+		///		定義ファイルが入っているパスを表します。
+		/// </summary>
+		private string definitionFilePath;
+
+		/// <summary>
+		///		ファイル名で利用できない文字を認識するための正規表現を表します。
+		/// </summary>
+		private static readonly Regex fileNameInvaildRecongnizer = new Regex( $"[{Regex.Escape( "\\/:*?\"<>|" )}]" );
+
+		/// <summary>
+		///		先頭に「$」が付いた名前をトークンとして認識するための正規表現を表します。
+		/// </summary>
+		private static readonly Regex tokenRecongnizer = new Regex( @"(?<=^(\$))(.*)" );
+
+		/// <summary>
+		///		先頭に「$」が付いた名前をトークンでは、「$」付きの名前として認識するための正規表現を表します。
+		/// </summary>
+		private static readonly Regex antiTokenRecongnizer = new Regex( @"(?<=^(\\))(\$.*)" );
+
+		/// <summary>
 		///		<see cref="DirectoryGenerator">クラスからメッセージを受け取った時に実行するイベントハンドラーです。
 		/// </summary>
 		public EventHandler<MessageEventArgs> NotifyMessageRecieved;
@@ -87,6 +108,8 @@ namespace DirGen {
 			NotifyMessage( $"'{xmlPath}' をロードしています。" );
 			XElement xml = XElement.Load( xmlPath );
 
+			definitionFilePath = Path.GetDirectoryName( Path.GetFullPath( xmlPath ) );
+
 			NotifyMessage( $"ディレクトリーの構成を読み込んでいます。" );
 			directoryTree = new XElement( xml.Element( "directory" ) );
 
@@ -99,22 +122,24 @@ namespace DirGen {
 					// トークンから置き換える文字列群（<token_value>ノードのvalue属性値のコレクション）を値に設定します。
 					tval => tval.Elements( "token_value" )
 								.Select( tv => tv.Attribute( "value" ).Value )
+								.Distinct()
 								.ToArray()
 				);
 
 			NotifyMessage( $"出力先のパスを読み込んでいます。" );
 			// target_pathが未指定の場合、アプリのパスを設定します。
-			targetRootPath = directoryTree.Attribute( "target_path" )?.Value ?? appPath;
+			targetRootPath = directoryTree.Attribute( "target_path" )?.Value ?? definitionFilePath;
 
 			// nameが未指定の場合、nullを設定します。
 			targetRootFolderName = directoryTree.Attribute( "name" )?.Value;
+
+			NotifyMessage( $"'{xmlPath}' のロードを完了しました。" );
 		}
 
 		/// <summary>
 		///		ディレクトリー構造を解析し、トークンを展開します。
 		/// </summary>
 		private void ExtractDirectoryTree() {
-
 			NotifyMessage( $"ディレクトリー構成を解析しています。" );
 
 			// 展開後のディレクトリー構造のXMLオブジェクトを作成します。
@@ -161,28 +186,45 @@ namespace DirGen {
 				#region トークンの展開
 
 				var name = curNode.Attribute( "name" );
-				// name属性の値がトークンであるかどうか判別します。
-				if( name?.Value != null && name.Value.Length > 0 && name.Value[0] == '$' ) {
-					// 「$」以降の文字列を取り出します。
-					var token = name.Value.Substring( 1 );
-					// トークンのあるノードの参照をコピーします。
-					var tokenNode = curNode;
-					// トークンが辞書に含まれているか判別します。
-					if( tokenListMap.ContainsKey( token ) ) {
-						// トークンに登録されているフォルダー名・ファイル名を展開します。
-						foreach( var item in tokenListMap[token] ) {
-							// 展開後の名前をname属性にしたノードを追加します。
-							curNode.AddAfterSelf( new XElement( tokenNode.Name, new XAttribute( "name", item ) ) );
-							// 追加したノードにアクセスします。
-							curNode = curNode.NextNode as XElement;
-							// トークンノードに子ノードがあれば、追加したノードの子にコピーします。
-							if( tokenNode.HasElements ) {
-								curNode.Add( tokenNode.Elements() );
+				if( name?.Value != null ) {
+					// name属性の値がトークンであるかどうか判別します。
+					if( tokenRecongnizer.IsMatch( name.Value ) ) {
+						// 「$」以降の文字列を取り出します。
+						var token = tokenRecongnizer.Match( name.Value ).Value;
+						// トークンのあるノードの参照をコピーします。
+						var tokenNode = curNode;
+						// トークンが辞書に含まれているか判別します。
+						if( tokenListMap.ContainsKey( token ) ) {
+							// トークンに登録されているフォルダー名・ファイル名を展開します。
+							foreach( var item in tokenListMap[token] ) {
+								if( fileNameInvaildRecongnizer.IsMatch( item ) ) {
+									throw new Exception( $"トークンに対応する名前 '{item}' に、ファイル名として使用できない文字（ \\ / : * ? \" < > | ）が含まれています。" );
+								}
+								// 展開後の名前をname属性にしたノードを追加します。
+								curNode.AddAfterSelf( new XElement( tokenNode.Name, new XAttribute( "name", item ) ) );
+								// 追加したノードにアクセスします。
+								curNode = curNode.NextNode as XElement;
+								// トークンノードに子ノードがあれば、追加したノードの子にコピーします。
+								if( tokenNode.HasElements ) {
+									curNode.Add( tokenNode.Elements() );
+								}
 							}
 						}
+						// トークンノードを削除します。
+						tokenNode.Remove();
 					}
-					// トークンノードを削除します。
-					tokenNode.Remove();
+					else {
+						if( antiTokenRecongnizer.IsMatch( name.Value ) ) {
+							// 先頭の「$」の前に付いている「\」を取り除きます。
+							name.Value = antiTokenRecongnizer.Match( name.Value ).Value;
+						}
+						if( fileNameInvaildRecongnizer.IsMatch( name.Value ) ) {
+							throw new Exception( $"名前 '{name.Value}' に、ファイル名として使用できない文字（ \\ / : * ? \" < > | ）が含まれています。" );
+						}
+					}
+				}
+				else {
+					throw new Exception( $"{curNode.Name} ノードにname属性が存在しないか、属性名が無効です。" );
 				}
 
 				#endregion
@@ -263,7 +305,7 @@ namespace DirGen {
 								var type = reader.Name;
 								if( reader.MoveToAttribute( "name" ) ) {
 									// フォルダー用のノードの時、name属性に指定した名前のフォルダーを作成し、カレントディレクトリーを移動します。
-									if( type == "path" ) {
+									if( type == "folder" ) {
 										var path = reader.Value;
 										NotifyMessage( $"ディレクトリー '{path}' を作成しています。( 出力先 : {Directory.GetCurrentDirectory()} )" );
 										Directory.CreateDirectory( path );
@@ -279,7 +321,7 @@ namespace DirGen {
 										var targetFilePath = Path.GetFileName( sourceFilePath );
 										// 移動元のファイルのパスを生成します。
 										if( !Path.IsPathRooted( sourceFilePath ) ) {
-											sourceFilePath = $"{appPath}\\{sourceFilePath}";
+											sourceFilePath = $"{definitionFilePath}\\{sourceFilePath}";
 										}
 										NotifyMessage( $"ファイル '{targetFilePath}' をコピーしています。( 出力先 : {Directory.GetCurrentDirectory()} )" );
 										File.Copy( sourceFilePath, targetFilePath );
@@ -288,7 +330,7 @@ namespace DirGen {
 								break;
 							case XmlNodeType.EndElement:        // 要素の終了ノード
 								// フォルダー用ノードの時、1つ親のフォルダーに移動します。
-								if( reader.Name == "path" ) {
+								if( reader.Name == "folder" ) {
 									Directory.SetCurrentDirectory( "..\\" );
 								}
 								break;
