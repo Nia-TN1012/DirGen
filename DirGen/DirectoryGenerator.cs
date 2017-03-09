@@ -267,7 +267,7 @@ namespace DirGen {
 
 				// ディレクトリーの出力先パスが存在するかどうか判別します。
 				if( !Directory.Exists( targetRootPath ) ) {
-					throw new Exception( $"出力先パス '{targetRootFolderName}' が存在しないか、ディレクトリー名が無効です。" );
+					throw new Exception( $"出力先パス '{targetRootPath}' が存在しないか、ディレクトリー名が無効です。" );
 				}
 
 				// ディレクトリーの出力先パスにカレントディレクトリーを移動します。
