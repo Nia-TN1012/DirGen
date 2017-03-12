@@ -182,7 +182,6 @@ namespace DirGen {
 					if( curNode.Elements().GroupBy( node => node.Attribute( "name" ).Value ).Any( _ => _.Count() >= 2 ) ) {
 						throw new Exception( $"'{curNode.Attribute( "name" ).Value}' フォルダーの中に、同じ名前のフォルダーまたはファイルが重複しています。" );
 					}
-
 					childNodeIsVisited = false;
 				}
 
