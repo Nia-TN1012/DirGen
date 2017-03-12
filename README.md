@@ -59,7 +59,7 @@ DirGenフォルダー
 DirGenマニュアル.pdfを参照してください。
 
 ## 著作権
-Chronoir Robocon Timerの著作権は 智中ニア（ Nia Tomonaka ） が所持しています。  
+DirGenの著作権は 智中ニア（ Nia Tomonaka ） が所持しています。  
 Copyright (C) 2014-2017 Chronoir.net
 
 
