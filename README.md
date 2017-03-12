@@ -14,7 +14,6 @@
 |開発言語|C# 6.0|
 |対応OS|Windows Vista( SP2以降 ) / 7 / 8 / 8.1 / 10|
 |必要ランタイム|.NET Framework 4.5.2以上|
-|著作権者|智中 ニア（ Nia Tomonaka ）|
 |再配布|可|
 |転載|可|
 |ホームページ|https://chronoir.net/|
