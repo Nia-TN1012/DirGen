@@ -77,7 +77,7 @@ namespace DirGen {
 		private static readonly Regex tokenRecongnizer = new Regex( @"(?<=^(\$))(.*)" );
 
 		/// <summary>
-		///		先頭に「$」が付いた名前をトークンでは、「$」付きの名前として認識するための正規表現を表します。
+		///		先頭に「$」が付いた名前をトークンではなく、「$」付きの名前として認識するための正規表現を表します。
 		/// </summary>
 		private static readonly Regex antiTokenRecongnizer = new Regex( @"(?<=^(\\))(\$.*)" );
 
