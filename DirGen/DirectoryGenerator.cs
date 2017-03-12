@@ -178,6 +178,11 @@ namespace DirGen {
 				}
 				// 子ノードを探索済みの場合、フラグをオフにします。
 				else if( childNodeIsVisited ) {
+					// 直下のサブディレクトリー内のフォルダー名やファイル名が重複していないかチェックします。
+					if( curNode.Elements().GroupBy( node => node.Attribute( "name" ).Value ).Any( _ => _.Count() >= 2 ) ) {
+						throw new Exception( $"'{curNode.Attribute( "name" ).Value}' フォルダーの中に、同じ名前のフォルダーまたはファイルが重複しています。" );
+					}
+
 					childNodeIsVisited = false;
 				}
 
